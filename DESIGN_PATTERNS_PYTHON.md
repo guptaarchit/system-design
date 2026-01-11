@@ -1532,6 +1532,761 @@ class CommandHistory:
 
 ---
 
+## SOLID Principles with Design Patterns
+
+SOLID is an acronym for five object-oriented design principles that work hand-in-hand with design patterns:
+
+1. **S** - Single Responsibility Principle
+2. **O** - Open/Closed Principle
+3. **L** - Liskov Substitution Principle
+4. **I** - Interface Segregation Principle
+5. **D** - Dependency Inversion Principle
+
+### Single Responsibility Principle (SRP)
+
+**Definition**: A class should have only one reason to change, meaning it should have only one job or responsibility.
+
+**Related Patterns**: Factory, Repository, Service Layer
+
+**Violation Example**:
+```python
+class User:
+    """Violates SRP - handles multiple responsibilities"""
+    
+    def __init__(self, name, email):
+        self.name = name
+        self.email = email
+    
+    def get_user_info(self):
+        return f"{self.name} - {self.email}"
+    
+    def save_to_database(self, db_connection):
+        """Database operation - different responsibility"""
+        query = f"INSERT INTO users (name, email) VALUES ('{self.name}', '{self.email}')"
+        db_connection.execute(query)
+    
+    def send_email(self, smtp_server, subject, body):
+        """Email operation - different responsibility"""
+        message = f"To: {self.email}\nSubject: {subject}\n\n{body}"
+        smtp_server.send(message)
+```
+
+**Correct Implementation**:
+```python
+class User:
+    """SRP: Only responsible for user data"""
+    
+    def __init__(self, name, email):
+        self.name = name
+        self.email = email
+    
+    def get_user_info(self):
+        return f"{self.name} - {self.email}"
+
+
+class UserRepository:
+    """SRP: Handle database operations (Repository Pattern)"""
+    
+    def __init__(self, db_connection):
+        self.db_connection = db_connection
+    
+    def save_user(self, user):
+        query = f"INSERT INTO users (name, email) VALUES ('{user.name}', '{user.email}')"
+        self.db_connection.execute(query)
+
+
+class EmailService:
+    """SRP: Handle email operations (Service Layer Pattern)"""
+    
+    def __init__(self, smtp_server):
+        self.smtp_server = smtp_server
+    
+    def send_email(self, user, subject, body):
+        message = f"To: {user.email}\nSubject: {subject}\n\n{body}"
+        self.smtp_server.send(message)
+```
+
+---
+
+### Open/Closed Principle (OCP)
+
+**Definition**: Software entities should be open for extension but closed for modification.
+
+**Related Patterns**: Strategy, Factory, Decorator, Template Method
+
+**Violation Example**:
+```python
+class AreaCalculator:
+    """Violates OCP - must modify class to add new shapes"""
+    
+    def calculate_area(self, shape):
+        if isinstance(shape, Rectangle):
+            return shape.width * shape.height
+        elif isinstance(shape, Circle):
+            return 3.14159 * shape.radius ** 2
+        # Adding new shape requires modifying this method
+        else:
+            raise ValueError("Unknown shape")
+```
+
+**Correct Implementation** (Strategy Pattern):
+```python
+from abc import ABC, abstractmethod
+
+class Shape(ABC):
+    """OCP: Open for extension"""
+    
+    @abstractmethod
+    def calculate_area(self):
+        pass
+
+class Rectangle(Shape):
+    def __init__(self, width, height):
+        self.width = width
+        self.height = height
+    
+    def calculate_area(self):
+        return self.width * self.height
+
+class Circle(Shape):
+    def __init__(self, radius):
+        self.radius = radius
+    
+    def calculate_area(self):
+        return 3.14159 * self.radius ** 2
+
+class AreaCalculator:
+    """OCP: Closed for modification - works with any Shape"""
+    
+    def calculate_total_area(self, shapes):
+        total = 0
+        for shape in shapes:
+            total += shape.calculate_area()
+        return total
+
+# New shapes can be added without modifying AreaCalculator
+class Square(Shape):
+    def __init__(self, side):
+        self.side = side
+    
+    def calculate_area(self):
+        return self.side ** 2
+```
+
+**Payment Processing Example** (Strategy Pattern):
+```python
+from abc import ABC, abstractmethod
+
+class PaymentMethod(ABC):
+    """OCP: Open for extension"""
+    
+    @abstractmethod
+    def process_payment(self, amount):
+        pass
+
+class CreditCardPayment(PaymentMethod):
+    def process_payment(self, amount):
+        return f"Processing ${amount} via Credit Card"
+
+class PayPalPayment(PaymentMethod):
+    def process_payment(self, amount):
+        return f"Processing ${amount} via PayPal"
+
+class PaymentProcessor:
+    """OCP: Closed for modification - works with any PaymentMethod"""
+    
+    def process_payment(self, payment_method, amount):
+        return payment_method.process_payment(amount)
+
+# New payment methods can be added without modifying PaymentProcessor
+class CryptocurrencyPayment(PaymentMethod):
+    def process_payment(self, amount):
+        return f"Processing ${amount} via Cryptocurrency"
+```
+
+---
+
+### Liskov Substitution Principle (LSP)
+
+**Definition**: Objects of a superclass should be replaceable with objects of its subclasses without breaking the application.
+
+**Related Patterns**: Strategy, Factory, Template Method
+
+**Violation Example**:
+```python
+class Rectangle:
+    def __init__(self, width, height):
+        self.width = width
+        self.height = height
+    
+    def set_width(self, width):
+        self.width = width
+    
+    def set_height(self, height):
+        self.height = height
+    
+    def get_area(self):
+        return self.width * self.height
+
+class Square(Rectangle):
+    """Violates LSP - Square cannot substitute Rectangle"""
+    
+    def __init__(self, side):
+        super().__init__(side, side)
+        self.side = side
+    
+    def set_width(self, width):
+        self.width = width
+        self.height = width  # Breaks Rectangle contract
+        self.side = width
+    
+    def set_height(self, height):
+        self.width = height  # Breaks Rectangle contract
+        self.height = height
+        self.side = height
+
+# Problem: Code that works with Rectangle breaks with Square
+def test_rectangle(rectangle):
+    rectangle.set_width(5)
+    rectangle.set_height(4)
+    expected_area = 20
+    assert rectangle.get_area() == expected_area
+
+square = Square(0)
+test_rectangle(square)  # Fails! Area is 16, not 20
+```
+
+**Correct Implementation**:
+```python
+from abc import ABC, abstractmethod
+
+class Shape(ABC):
+    """Base class for all shapes"""
+    
+    @abstractmethod
+    def get_area(self):
+        pass
+
+class Rectangle(Shape):
+    def __init__(self, width, height):
+        self.width = width
+        self.height = height
+    
+    def set_width(self, width):
+        self.width = width
+    
+    def set_height(self, height):
+        self.height = height
+    
+    def get_area(self):
+        return self.width * self.height
+
+class Square(Shape):
+    """LSP: Square is substitutable for Shape"""
+    
+    def __init__(self, side):
+        self.side = side
+    
+    def set_side(self, side):
+        self.side = side
+    
+    def get_area(self):
+        return self.side ** 2
+
+# Both can be used interchangeably where Shape is expected
+def calculate_total_area(shapes):
+    """LSP: Works with any Shape subclass"""
+    total = 0
+    for shape in shapes:
+        total += shape.get_area()
+    return total
+```
+
+**Payment Method Example** (Strategy Pattern):
+```python
+from abc import ABC, abstractmethod
+
+class PaymentMethod(ABC):
+    """LSP: All payment methods are substitutable"""
+    
+    @abstractmethod
+    def process_payment(self, amount: float) -> bool:
+        pass
+
+class CreditCardPayment(PaymentMethod):
+    def process_payment(self, amount: float) -> bool:
+        print(f"Processing ${amount} via Credit Card")
+        return True
+
+class PayPalPayment(PaymentMethod):
+    def process_payment(self, amount: float) -> bool:
+        print(f"Processing ${amount} via PayPal")
+        return True
+
+class BankTransferPayment(PaymentMethod):
+    def process_payment(self, amount: float) -> bool:
+        print(f"Processing ${amount} via Bank Transfer")
+        return True
+
+# All payment methods can be used interchangeably
+def process_order(payment_method: PaymentMethod, amount: float):
+    """LSP: Works with any PaymentMethod subclass"""
+    return payment_method.process_payment(amount)
+```
+
+---
+
+### Interface Segregation Principle (ISP)
+
+**Definition**: Clients should not be forced to depend on interfaces they do not use. Many client-specific interfaces are better than one general-purpose interface.
+
+**Related Patterns**: Adapter, Facade, Proxy
+
+**Violation Example**:
+```python
+from abc import ABC, abstractmethod
+
+class Worker(ABC):
+    """Violates ISP - forces all workers to implement all methods"""
+    
+    @abstractmethod
+    def work(self):
+        pass
+    
+    @abstractmethod
+    def eat(self):
+        pass
+    
+    @abstractmethod
+    def sleep(self):
+        pass
+
+class HumanWorker(Worker):
+    def work(self):
+        return "Human working"
+    
+    def eat(self):
+        return "Human eating"
+    
+    def sleep(self):
+        return "Human sleeping"
+
+class RobotWorker(Worker):
+    """Forced to implement methods it doesn't need"""
+    
+    def work(self):
+        return "Robot working"
+    
+    def eat(self):
+        raise NotImplementedError("Robots don't eat")
+    
+    def sleep(self):
+        raise NotImplementedError("Robots don't sleep")
+```
+
+**Correct Implementation**:
+```python
+from abc import ABC, abstractmethod
+
+class Workable(ABC):
+    """ISP: Segregated interface for work"""
+    
+    @abstractmethod
+    def work(self):
+        pass
+
+class Eatable(ABC):
+    """ISP: Segregated interface for eating"""
+    
+    @abstractmethod
+    def eat(self):
+        pass
+
+class Sleepable(ABC):
+    """ISP: Segregated interface for sleeping"""
+    
+    @abstractmethod
+    def sleep(self):
+        pass
+
+class HumanWorker(Workable, Eatable, Sleepable):
+    """Implements all interfaces it needs"""
+    
+    def work(self):
+        return "Human working"
+    
+    def eat(self):
+        return "Human eating"
+    
+    def sleep(self):
+        return "Human sleeping"
+
+class RobotWorker(Workable):
+    """Only implements interface it needs"""
+    
+    def work(self):
+        return "Robot working"
+
+# Usage
+def manage_worker(worker: Workable):
+    """ISP: Only depends on Workable interface"""
+    return worker.work()
+
+def feed_worker(worker: Eatable):
+    """ISP: Only depends on Eatable interface"""
+    return worker.eat()
+```
+
+**Document Machine Example**:
+```python
+from abc import ABC, abstractmethod
+
+class Printer(ABC):
+    """ISP: Segregated interface"""
+    @abstractmethod
+    def print_document(self, document):
+        pass
+
+class Scanner(ABC):
+    """ISP: Segregated interface"""
+    @abstractmethod
+    def scan_document(self, document):
+        pass
+
+class FaxMachine(ABC):
+    """ISP: Segregated interface"""
+    @abstractmethod
+    def fax_document(self, document):
+        pass
+
+class MultiFunctionPrinter(Printer, Scanner, FaxMachine):
+    """Implements all interfaces"""
+    
+    def print_document(self, document):
+        return f"Printing {document}"
+    
+    def scan_document(self, document):
+        return f"Scanning {document}"
+    
+    def fax_document(self, document):
+        return f"Faxing {document}"
+
+class SimplePrinter(Printer):
+    """Only implements Printer interface"""
+    
+    def print_document(self, document):
+        return f"Printing {document}"
+```
+
+---
+
+### Dependency Inversion Principle (DIP)
+
+**Definition**: High-level modules should not depend on low-level modules. Both should depend on abstractions. Abstractions should not depend on details. Details should depend on abstractions.
+
+**Related Patterns**: Dependency Injection, Factory, Strategy, Adapter
+
+**Violation Example**:
+```python
+class MySQLDatabase:
+    """Low-level module"""
+    
+    def connect(self):
+        return "Connected to MySQL"
+    
+    def query(self, sql):
+        return f"Executing {sql} on MySQL"
+
+class UserService:
+    """High-level module - violates DIP by depending on concrete class"""
+    
+    def __init__(self):
+        # Direct dependency on concrete implementation
+        self.database = MySQLDatabase()
+    
+    def get_user(self, user_id):
+        self.database.connect()
+        return self.database.query(f"SELECT * FROM users WHERE id = {user_id}")
+
+# Problem: UserService is tightly coupled to MySQLDatabase
+# Changing database requires modifying UserService
+```
+
+**Correct Implementation** (Dependency Injection):
+```python
+from abc import ABC, abstractmethod
+
+class Database(ABC):
+    """Abstraction - high-level and low-level depend on this"""
+    
+    @abstractmethod
+    def connect(self):
+        pass
+    
+    @abstractmethod
+    def query(self, sql):
+        pass
+
+class MySQLDatabase(Database):
+    """Low-level module - depends on abstraction"""
+    
+    def connect(self):
+        return "Connected to MySQL"
+    
+    def query(self, sql):
+        return f"Executing {sql} on MySQL"
+
+class PostgreSQLDatabase(Database):
+    """Low-level module - depends on abstraction"""
+    
+    def connect(self):
+        return "Connected to PostgreSQL"
+    
+    def query(self, sql):
+        return f"Executing {sql} on PostgreSQL"
+
+class UserService:
+    """High-level module - depends on abstraction, not concrete class"""
+    
+    def __init__(self, database: Database):
+        # DIP: Depends on abstraction
+        self.database = database
+    
+    def get_user(self, user_id):
+        self.database.connect()
+        return self.database.query(f"SELECT * FROM users WHERE id = {user_id}")
+
+# Usage - Dependency Injection
+mysql_db = MySQLDatabase()
+user_service_mysql = UserService(mysql_db)
+
+postgres_db = PostgreSQLDatabase()
+user_service_postgres = UserService(postgres_db)
+```
+
+**Notification System Example** (Strategy Pattern + Dependency Injection):
+```python
+from abc import ABC, abstractmethod
+
+class NotificationChannel(ABC):
+    """DIP: Abstraction for notification channels"""
+    
+    @abstractmethod
+    def send(self, to, message):
+        pass
+
+class EmailService(NotificationChannel):
+    def send(self, to, message):
+        return f"Sending email to {to}: {message}"
+
+class SMSService(NotificationChannel):
+    def send(self, to, message):
+        return f"Sending SMS to {to}: {message}"
+
+class PushNotificationService(NotificationChannel):
+    def send(self, to, message):
+        return f"Sending push notification to {to}: {message}"
+
+class NotificationService:
+    """DIP: High-level module depends on abstraction"""
+    
+    def __init__(self, notification_channel: NotificationChannel):
+        self.notification_channel = notification_channel
+    
+    def notify(self, to, message):
+        return self.notification_channel.send(to, message)
+
+# Usage - Dependency Injection
+email_channel = EmailService()
+notification_service = NotificationService(email_channel)
+notification_service.notify("user@example.com", "Hello!")
+```
+
+---
+
+### Complete Example: E-Commerce System Applying All SOLID Principles
+
+```python
+from abc import ABC, abstractmethod
+from typing import List
+
+# ========== Single Responsibility Principle ==========
+
+class Product:
+    """SRP: Only responsible for product data"""
+    def __init__(self, product_id, name, price):
+        self.product_id = product_id
+        self.name = name
+        self.price = price
+
+class Order:
+    """SRP: Only responsible for order data"""
+    def __init__(self, order_id, customer_id):
+        self.order_id = order_id
+        self.customer_id = customer_id
+        self.items: List[Product] = []
+        self.total = 0.0
+    
+    def add_item(self, product: Product):
+        self.items.append(product)
+        self.total += product.price
+
+# ========== Open/Closed Principle ==========
+
+class DiscountStrategy(ABC):
+    """OCP: Open for extension, closed for modification (Strategy Pattern)"""
+    @abstractmethod
+    def calculate_discount(self, order: Order) -> float:
+        pass
+
+class NoDiscount(DiscountStrategy):
+    def calculate_discount(self, order: Order) -> float:
+        return 0.0
+
+class PercentageDiscount(DiscountStrategy):
+    def __init__(self, percentage):
+        self.percentage = percentage
+    
+    def calculate_discount(self, order: Order) -> float:
+        return order.total * (self.percentage / 100)
+
+class FixedDiscount(DiscountStrategy):
+    def __init__(self, amount):
+        self.amount = amount
+    
+    def calculate_discount(self, order: Order) -> float:
+        return min(self.amount, order.total)
+
+# ========== Liskov Substitution Principle ==========
+
+class PaymentMethod(ABC):
+    """LSP: All payment methods are substitutable (Strategy Pattern)"""
+    @abstractmethod
+    def process_payment(self, amount: float) -> bool:
+        pass
+
+class CreditCardPayment(PaymentMethod):
+    def process_payment(self, amount: float) -> bool:
+        print(f"Processing ${amount} via Credit Card")
+        return True
+
+class PayPalPayment(PaymentMethod):
+    def process_payment(self, amount: float) -> bool:
+        print(f"Processing ${amount} via PayPal")
+        return True
+
+# ========== Interface Segregation Principle ==========
+
+class OrderRepository(ABC):
+    """ISP: Segregated interface for order persistence"""
+    @abstractmethod
+    def save(self, order: Order):
+        pass
+    
+    @abstractmethod
+    def find_by_id(self, order_id: str) -> Order:
+        pass
+
+class EmailNotifier(ABC):
+    """ISP: Segregated interface for email notifications"""
+    @abstractmethod
+    def send_email(self, to: str, subject: str, body: str):
+        pass
+
+# ========== Dependency Inversion Principle ==========
+
+class OrderService:
+    """DIP: Depends on abstractions, not concrete implementations"""
+    
+    def __init__(
+        self,
+        order_repository: OrderRepository,
+        discount_strategy: DiscountStrategy,
+        payment_method: PaymentMethod,
+        email_notifier: EmailNotifier = None
+    ):
+        self.order_repository = order_repository
+        self.discount_strategy = discount_strategy
+        self.payment_method = payment_method
+        self.email_notifier = email_notifier
+    
+    def process_order(self, order: Order) -> bool:
+        discount = self.discount_strategy.calculate_discount(order)
+        final_amount = order.total - discount
+        
+        if self.payment_method.process_payment(final_amount):
+            self.order_repository.save(order)
+            
+            if self.email_notifier:
+                self.email_notifier.send_email(
+                    order.customer_id,
+                    "Order Confirmation",
+                    f"Your order {order.order_id} has been processed."
+                )
+            return True
+        return False
+
+# Concrete implementations
+class InMemoryOrderRepository(OrderRepository):
+    def __init__(self):
+        self.orders = {}
+    
+    def save(self, order: Order):
+        self.orders[order.order_id] = order
+        print(f"Order {order.order_id} saved")
+    
+    def find_by_id(self, order_id: str) -> Order:
+        return self.orders.get(order_id)
+
+class ConsoleEmailNotifier(EmailNotifier):
+    def send_email(self, to: str, subject: str, body: str):
+        print(f"Email to {to}: {subject} - {body}")
+
+# Usage - Dependency Injection
+product1 = Product("P001", "Laptop", 1000.0)
+product2 = Product("P002", "Mouse", 25.0)
+
+order = Order("ORD001", "CUST001")
+order.add_item(product1)
+order.add_item(product2)
+
+order_repository = InMemoryOrderRepository()
+discount_strategy = PercentageDiscount(10)  # 10% discount
+payment_method = CreditCardPayment()
+email_notifier = ConsoleEmailNotifier()
+
+order_service = OrderService(
+    order_repository,
+    discount_strategy,
+    payment_method,
+    email_notifier
+)
+
+success = order_service.process_order(order)
+print(f"Order processed: {success}")
+```
+
+---
+
+### SOLID Principles Summary
+
+| Principle | Key Concept | Related Patterns | Benefit |
+|-----------|------------|------------------|---------|
+| **SRP** | One class, one responsibility | Factory, Repository, Service Layer | Easier maintenance, testing |
+| **OCP** | Open for extension, closed for modification | Strategy, Factory, Decorator, Template Method | Easy to add features without breaking existing code |
+| **LSP** | Subtypes must be substitutable | Strategy, Factory, Template Method | Polymorphism works correctly |
+| **ISP** | Clients shouldn't depend on unused interfaces | Adapter, Facade, Proxy | Flexible, focused interfaces |
+| **DIP** | Depend on abstractions, not concretions | Dependency Injection, Factory, Strategy, Adapter | Loose coupling, testability |
+
+**Benefits of SOLID Principles**:
+- **Maintainability**: Easier to understand and modify code
+- **Testability**: Easier to write unit tests with mocked dependencies
+- **Flexibility**: Easy to extend functionality without breaking existing code
+- **Reusability**: Components can be reused in different contexts
+- **Scalability**: Code structure supports growth
+
+---
+
 ## Best Practices
 
 1. **Prefer Composition over Inheritance**: Use decorators, strategies
